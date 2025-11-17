@@ -1,0 +1,5 @@
+build/
+random_walk
+*.bin
+*.o
+*.mod
