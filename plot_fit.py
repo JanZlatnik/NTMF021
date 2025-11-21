@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
+from matplotlib.ticker import ScalarFormatter
 
 stats_file = 'Rstatistics.txt'
 output_pdf = 'fit_plot.pdf'
@@ -40,15 +41,15 @@ mean_nb, std_nb = data[:, 3], data[:, 4]
 mean_oo, std_oo = data[:, 5], data[:, 6]
 
 
-log_n = np.log(n_steps)
-log_R_s = np.log(mean_s)
-log_R_nb = np.log(mean_nb)
-log_R_oo = np.log(mean_oo)
+log_n = np.log10(n_steps)
+log_R_s = np.log10(mean_s)
+log_R_nb = np.log10(mean_nb)
+log_R_oo = np.log10(mean_oo)
 
-
-err_s = std_s / mean_s
-err_nb = std_nb / mean_nb
-err_oo = std_oo / mean_oo
+ln_10 = np.log(10)
+err_s = std_s / mean_s / ln_10
+err_nb = std_nb / mean_nb / ln_10
+err_oo = std_oo / mean_oo / ln_10
 
 
 w_s = 1.0 / (err_s**2)
@@ -61,8 +62,8 @@ def get_fit_params(x, y, w):
     err_alpha = np.sqrt(cov[0, 0])
     ln_c = fit[1]
     err_ln_c = np.sqrt(cov[1, 1])
-    c = np.exp(ln_c)
-    err_c = c * err_ln_c
+    c = 10**ln_c
+    err_c = c * err_ln_c * ln_10
     return alpha, err_alpha, c, err_c
 
 alpha_s, err_alpha_s, c_s, err_c_s = get_fit_params(log_n, log_R_s, w_s)
@@ -74,30 +75,33 @@ print(f"  No-Back RW    -> α = {alpha_nb:.4f} ± {err_alpha_nb:.4f}, c = {c_nb:
 print(f"  Self-Avoiding -> α = {alpha_oo:.4f} ± {err_alpha_oo:.4f}, c = {c_oo:.3f} ± {err_c_oo:.3f}")
 
 
-fit_x = np.linspace(log_n.min(), log_n.max(), 100)
-fit_y_s = np.polyval([alpha_s, np.log(c_s)], fit_x)
-fit_y_nb = np.polyval([alpha_nb, np.log(c_nb)], fit_x)
-fit_y_oo = np.polyval([alpha_oo, np.log(c_oo)], fit_x)
+fit_x = np.geomspace(n_steps.min(), n_steps.max(), 300)
+fit_y_s = c_s * (fit_x ** alpha_s)
+fit_y_nb = c_nb * (fit_x ** alpha_nb)
+fit_y_oo = c_oo * (fit_x ** alpha_oo)
 
 
 fig, ax = plt.subplots(figsize=(10, 8))
 
 
-ax.errorbar(log_n, log_R_s, yerr=err_s, fmt='o', capsize=5, color='red', label=f'Simple RW ($\\alpha = {alpha_s:.3f} \pm {err_alpha_s:.3f}$, $c = {c_s:.2f} \pm {err_c_s:.2f}$)')
+ax.errorbar(n_steps, mean_s, yerr=std_s, fmt='o', capsize=5, color='red', label=f'Simple RW ($\\alpha = {alpha_s:.3f} \pm {err_alpha_s:.3f}$, $c = {c_s:.3f} \pm {err_c_s:.3f}$)')
 
-ax.errorbar(log_n, log_R_nb, yerr=err_nb, fmt='s', capsize=5, color='blue', label=f'No-Back RW ($\\alpha = {alpha_nb:.3f} \pm {err_alpha_nb:.3f}$, $c = {c_nb:.2f} \pm {err_c_nb:.2f}$)')
+ax.errorbar(n_steps, mean_nb, yerr=std_nb, fmt='s', capsize=5, color='blue', label=f'No-Back RW ($\\alpha = {alpha_nb:.3f} \pm {err_alpha_nb:.3f}$, $c = {c_nb:.3f} \pm {err_c_nb:.3f}$)')
 
-ax.errorbar(log_n, log_R_oo, yerr=err_oo, fmt='^', capsize=5, color='green', label=f'Self-Avoiding ($\\alpha = {alpha_oo:.3f} \pm {err_alpha_oo:.3f}$, $c = {c_oo:.2f} \pm {err_c_oo:.2f}$)')
+ax.errorbar(n_steps, mean_oo, yerr=std_oo, fmt='^', capsize=5, color='green', label=f'Self-Avoiding ($\\alpha = {alpha_oo:.3f} \pm {err_alpha_oo:.3f}$, $c = {c_oo:.3f} \pm {err_c_oo:.3f}$)')
 
 
-ax.plot(fit_x, fit_y_s, color='red', linestyle='-.', alpha=0.7, label='_nolegend_')
-ax.plot(fit_x, fit_y_nb, color='blue', linestyle='-.', alpha=0.7, label='_nolegend_')
-ax.plot(fit_x, fit_y_oo, color='green', linestyle='-.', alpha=0.7, label='_nolegend_')
+ax.plot(fit_x, fit_y_s, color='red', linestyle='-.', alpha=0.7)
+ax.plot(fit_x, fit_y_nb, color='blue', linestyle='-.', alpha=0.7)
+ax.plot(fit_x, fit_y_oo, color='green', linestyle='-.', alpha=0.7)
+
+ax.set_xscale('log')
+ax.set_yscale('log')
 
 
 ax.set_title('Log-Log plot of R vs. n (Penrose Tiling)')
-ax.set_xlabel('$\ln(n)$ (Number of steps)')
-ax.set_ylabel('$\ln(R)$ (Mean distance)')
+ax.set_xlabel('$n$ (Number of steps)')
+ax.set_ylabel('$R$ (Mean distance)')
 
 
 ax.legend(loc='best', frameon=False)
