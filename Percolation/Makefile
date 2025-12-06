@@ -61,9 +61,9 @@ $(TARGET): $(OBJS)
 
 # --- EXPLICIT DEPENDENCIES ---
 build/Penrose.o: 
-#build/RandomWalk.o:
+build/Percolation.o: build/Penrose.o
 
-build/MAIN.o: build/Penrose.o 
+build/MAIN.o: build/Penrose.o build/Percolation.o
 
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.f90

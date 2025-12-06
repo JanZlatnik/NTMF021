@@ -2,7 +2,7 @@
 !                                                                                  !    
 ! Contains: Runns all modules, exports data                                        !
 !                                                                                  !
-! Last revision:    05/12/2025                                                     !                  
+! Last revision:    06/12/2025                                                     !                  
 !                                                                                  !
 !----------------------------------------------------------------------------------!
 
@@ -10,6 +10,7 @@
 
 PROGRAM MAIN
     USE Penrose
+    USE Percolation
     IMPLICIT NONE
 
 
@@ -17,11 +18,15 @@ PROGRAM MAIN
     ! Computation settings & parameters
     ! =======================================================================
     LOGICAL, PARAMETER              :: test_grid_plotting = .TRUE.
-    LOGICAL, PARAMETER              :: percolation_computation = .FALSE.
+    LOGICAL, PARAMETER              :: percolation_computation = .TRUE.
 
     INTEGER, PARAMETER              :: n_plotting_iterations = 7
 
-    INTEGER, PARAMETER              :: nsteps_array(*) = (/ 5, 10, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250 /)
+    INTEGER, PARAMETER              :: n_iter_array(*) = (/ 7, 9, 11, 13 /)
+    INTEGER, PARAMETER              :: n_prob_points = 200
+    REAL(8), PARAMETER              :: p_crit_expected = 0.638d0
+    REAL(8), PARAMETER              :: a_steep = 8.0d0
+    REAL(8), PARAMETER              :: range_lim = 0.995d0
 
     ! =======================================================================
     ! Grid generation parameters
@@ -37,7 +42,8 @@ PROGRAM MAIN
     INTEGER, ALLOCATABLE :: edges(:,:), num_edges(:)
     INTEGER :: i, j, id1, id2
     INTEGER :: iounit
-    CHARACTER(LEN=256) :: message
+    REAL*8, ALLOCATABLE :: p_occup_array(:)
+    REAL*8 :: x, prob
 
 
 
@@ -45,6 +51,10 @@ PROGRAM MAIN
     ! Generate Penrose grid and export to files for plotting and testing
     ! =======================================================================
     IF (test_grid_plotting) THEN
+
+        CALL CONSOLE("======================================================================")
+        CALL CONSOLE("                   STARTING PENROSE GRID TEST                         ")
+        CALL CONSOLE("======================================================================")
 
         CALL CONSOLE("Generating Penrose grid for plotting...")
 
@@ -117,6 +127,11 @@ PROGRAM MAIN
 
         CALL CONSOLE("Export complete: nodes.txt, edges.txt, boundary_SW.txt, boundary_NE.txt")
 
+
+        CALL CONSOLE("======================================================================")
+        CALL CONSOLE("                     PENROSE GRID TEST COMPLETED                      ")
+        CALL CONSOLE("======================================================================")
+
     END IF
 
 
@@ -126,8 +141,24 @@ PROGRAM MAIN
 
     IF (percolation_computation) THEN
 
-        CALL CONSOLE("xxx...")
+        CALL CONSOLE("======================================================================")
+        CALL CONSOLE("                   STARTING PERCOLATION SIMULATION                    ")
+        CALL CONSOLE("======================================================================")
 
+        ALLOCATE(p_occup_array(n_prob_points))
+
+        DO i = 1, n_prob_points
+            x = -range_lim + REAL((i-1),8) / REAL(n_prob_points-1,8) * 2.0d0 * range_lim
+            prob = p_crit_expected + ATANH(x) / a_steep
+            p_occup_array(i) = MAX(0.001d0, MIN(0.999d0, prob))
+        END DO
+
+        CALL CONSOLE("Initializing computation modules...")
+        CALL master_percolations(n_iter_array, p_occup_array, xtip, ytip)
+
+        CALL CONSOLE("======================================================================")
+        CALL CONSOLE("                       SIMULATION COMPLETED                           ")
+        CALL CONSOLE("======================================================================")
 
     END IF
 
