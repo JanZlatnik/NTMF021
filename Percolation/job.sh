@@ -7,13 +7,13 @@
 
 # --- SBATCH Partition Settings ---
 #SBATCH --partition=ffa
-#SBATCH --time=00:01:00
+#SBATCH --time=11:59:00
 
 # --- SBATCH Computation settings Settings ---
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=1
-#SBATCH --mem-per-cpu=1G
+#SBATCH --cpus-per-task=64
+#SBATCH --mem=4G
 
 
 echo "=========================================================="
@@ -21,6 +21,10 @@ echo "Job ID: $SLURM_JOB_ID"
 echo "Running on node: $SLURM_NODELIST"
 echo "Number of CPUs: $SLURM_CPUS_PER_TASK"
 echo "Working directory: $(pwd)" 
+echo "=========================================================="
+
+echo "================ HARDWARE DETALS ========================="
+lscpu
 echo "=========================================================="
 
 # Modules loading

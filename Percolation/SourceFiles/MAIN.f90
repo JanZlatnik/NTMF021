@@ -23,9 +23,9 @@ PROGRAM MAIN
     INTEGER, PARAMETER              :: n_plotting_iterations = 7
 
     INTEGER, PARAMETER              :: n_iter_array(*) = (/ 7, 9, 11, 13 /)
-    INTEGER, PARAMETER              :: n_prob_points = 200
-    REAL(8), PARAMETER              :: p_crit_expected = 0.638d0
-    REAL(8), PARAMETER              :: a_steep = 8.0d0
+    INTEGER, PARAMETER              :: n_prob_points = 250
+    REAL(8), PARAMETER              :: p_crit_expected = 0.5839d0
+    REAL(8), PARAMETER              :: a_steep = 16.0d0
     REAL(8), PARAMETER              :: range_lim = 0.995d0
 
     ! =======================================================================

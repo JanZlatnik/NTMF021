@@ -23,7 +23,7 @@ MODULE Percolation
     ! =======================================================================
     ! Subroutine that occupies grid and computes whether it is spanned
     ! =======================================================================
-    SUBROUTINE percolate(n_nodes, neighbors, num_neighbors, boundary_flags, p_occup, is_spanned)
+    SUBROUTINE percolate(n_nodes, neighbors, num_neighbors, boundary_flags, p_occup, occupied, clusters, cluster_flags, is_spanned)
         IMPLICIT NONE
         INTEGER, INTENT(IN)                 :: n_nodes
         INTEGER, DIMENSION(:,:), INTENT(IN) :: neighbors
@@ -32,21 +32,16 @@ MODULE Percolation
         REAL(8), INTENT(IN)                 :: p_occup
         LOGICAL, INTENT(OUT)                :: is_spanned
 
-        LOGICAL, ALLOCATABLE :: occupied(:)
-        INTEGER, ALLOCATABLE :: clusters(:)
-        LOGICAL, ALLOCATABLE :: cluster_flags(:,:)
+        LOGICAL, INTENT(INOUT) :: occupied(:)
+        INTEGER, INTENT(INOUT) :: clusters(:)
+        LOGICAL, INTENT(INOUT) :: cluster_flags(:,:)
 
         INTEGER :: i, j, k
         REAL(8) :: rand_num
 
-        ALLOCATE(occupied(n_nodes))
-        ALLOCATE(clusters(n_nodes))
-        ALLOCATE(cluster_flags(2, n_nodes))
 
         is_spanned = .FALSE.
-        occupied = .FALSE.
-        cluster_flags = .FALSE.
-        clusters = 0
+
 
         DO i = 1, n_nodes
             CALL RANDOM_NUMBER(rand_num)
@@ -56,6 +51,10 @@ MODULE Percolation
 
                 cluster_flags(1, i) = boundary_flags(i, 1)
                 cluster_flags(2, i) = boundary_flags(i, 2)
+            ELSE 
+                occupied(i) = .FALSE.
+                cluster_flags(:, i) = .FALSE.
+                clusters(i) = 0
             END IF
         END DO
 
@@ -84,10 +83,6 @@ MODULE Percolation
                 END IF
             END IF
         END DO
-
-        DEALLOCATE(occupied, clusters, cluster_flags)
-
-
 
 
 
@@ -139,6 +134,10 @@ MODULE Percolation
         INTEGER :: i, n_spanned
         LOGICAL :: is_spanned
 
+        LOGICAL, ALLOCATABLE :: occupied(:)
+        INTEGER, ALLOCATABLE :: clusters(:)
+        LOGICAL, ALLOCATABLE :: cluster_flags(:,:)
+
         INTEGER :: n_threads, max_seed_size, th_id
         INTEGER, ALLOCATABLE :: thread_seeds(:,:), temp_seed(:)
 
@@ -161,18 +160,24 @@ MODULE Percolation
         !$OMP BARRIER
 
 
-        !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, th_id, is_spanned) REDUCTION(+:n_spanned)
+        !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, th_id, is_spanned, occupied, clusters, cluster_flags) REDUCTION(+:n_spanned)
             th_id = OMP_GET_THREAD_NUM() + 1
             CALL RANDOM_SEED(PUT=thread_seeds(th_id,:))
 
-            !$OMP DO SCHEDULE(DYNAMIC)
+            ALLOCATE(occupied(n_nodes))
+            ALLOCATE(clusters(n_nodes))
+            ALLOCATE(cluster_flags(2, n_nodes))
+
+            !$OMP DO SCHEDULE(STATIC)
             DO i = 1, nSims
-                CALL percolate(n_nodes, neighbors, num_neighbors, boundary_flags, p_occup, is_spanned)
+                CALL percolate(n_nodes, neighbors, num_neighbors, boundary_flags, p_occup, occupied, clusters, cluster_flags, is_spanned)
                 IF (is_spanned) THEN
                     n_spanned = n_spanned + 1
                 END IF
             END DO
             !$OMP END DO
+
+            DEALLOCATE(occupied, clusters, cluster_flags)
 
         !$OMP END PARALLEL
 
