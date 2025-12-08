@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 from matplotlib.ticker import ScalarFormatter
 
-stats_file = 'Rstatistics.txt'
-output_pdf = 'fit_plot.pdf'
+stats_file = 'results/Rstatistics.txt'
+output_pdf = 'results/fit_plot.pdf'
 
 
 SMALL_SIZE = 14
@@ -99,9 +99,9 @@ ax.set_xscale('log')
 ax.set_yscale('log')
 
 
-ax.set_title('Log-Log plot of R vs. n (Penrose Tiling)')
-ax.set_xlabel('$n$ (Number of steps)')
-ax.set_ylabel('$R$ (Mean distance)')
+ax.set_title('Log-Log plot of $R$ vs. $n$ on Penrose Tiling')
+ax.set_xlabel('Number of steps')
+ax.set_ylabel('Mean radial distance')
 
 
 ax.legend(loc='best', frameon=False)

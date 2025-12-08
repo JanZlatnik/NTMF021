@@ -1,5 +1,7 @@
 build/
 random_walk
+percolation
 *.bin
 *.o
 *.mod
+

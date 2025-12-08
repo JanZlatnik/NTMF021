@@ -14,7 +14,7 @@ MODULE RandomWalk
     PRIVATE
     PUBLIC :: simulate_random_walks
 
-    INTEGER, PARAMETER :: nWalks = 10000
+    INTEGER, PARAMETER :: nWalks = 100000
 
     CONTAINS
 
@@ -23,13 +23,14 @@ MODULE RandomWalk
     ! =======================================================================
 
 
-    SUBROUTINE random_walk_simple(nsteps, edges, num_edges, start_ID, final_ID)
+    SUBROUTINE random_walk_simple(nsteps, edges, num_edges, start_ID, final_ID, seed)
         IMPLICIT NONE
         INTEGER, INTENT(IN)                         :: nsteps
         INTEGER, DIMENSION(:,:), INTENT(IN)         :: edges
         INTEGER, DIMENSION(:), INTENT(IN)           :: num_edges
         INTEGER, INTENT(IN)                         :: start_ID
         INTEGER, INTENT(OUT)                        :: final_ID
+        INTEGER(8), INTENT(INOUT)                   :: seed
 
         INTEGER :: current_ID, i, nedge, rand_i
         REAL(8) :: rand_val
@@ -38,7 +39,7 @@ MODULE RandomWalk
 
         DO i = 1, nsteps
             nedge = num_edges(current_ID)
-            CALL RANDOM_NUMBER(rand_val)
+            rand_val = xorshift(seed)
             rand_i = INT(rand_val * REAL(nedge)) + 1
             current_ID = edges(current_ID, rand_i)
         END DO
@@ -49,7 +50,7 @@ MODULE RandomWalk
 
 
 
-    SUBROUTINE random_walk_noback(nsteps, edges, num_edges, start_ID, final_ID, nsteps_done)
+    SUBROUTINE random_walk_noback(nsteps, edges, num_edges, start_ID, final_ID, nsteps_done, seed)
         IMPLICIT NONE
         INTEGER, INTENT(IN)                         :: nsteps
         INTEGER, DIMENSION(:,:), INTENT(IN)         :: edges
@@ -57,6 +58,7 @@ MODULE RandomWalk
         INTEGER, INTENT(IN)                         :: start_ID
         INTEGER, INTENT(OUT)                        :: final_ID
         INTEGER, INTENT(OUT)                        :: nsteps_done
+        INTEGER(8), INTENT(INOUT)                   :: seed
 
         INTEGER :: current_ID, prev_ID, nedge, rand_i, num_candidates
         INTEGER :: i, j
@@ -83,7 +85,7 @@ MODULE RandomWalk
                 final_ID = current_ID
                 RETURN
             ELSE 
-                CALL RANDOM_NUMBER(rand_val)
+                rand_val = xorshift(seed)
                 rand_i = INT(rand_val * REAL(num_candidates)) + 1
                 prev_ID = current_ID
                 current_ID = candidates(rand_i)
@@ -96,7 +98,7 @@ MODULE RandomWalk
     END SUBROUTINE random_walk_noback
 
 
-    SUBROUTINE random_walk_onlyonce(nsteps, edges, num_edges, start_ID, final_ID, nsteps_done)
+    SUBROUTINE random_walk_onlyonce(nsteps, edges, num_edges, start_ID, final_ID, nsteps_done, seed)
         IMPLICIT NONE
         INTEGER, INTENT(IN)                         :: nsteps
         INTEGER, DIMENSION(:,:), INTENT(IN)         :: edges
@@ -104,6 +106,7 @@ MODULE RandomWalk
         INTEGER, INTENT(IN)                         :: start_ID
         INTEGER, INTENT(OUT)                        :: final_ID
         INTEGER, INTENT(OUT)                        :: nsteps_done
+        INTEGER(8), INTENT(INOUT)                   :: seed
 
         INTEGER :: current_ID, nedge, rand_i, num_candidates
         INTEGER :: i, j
@@ -133,7 +136,7 @@ MODULE RandomWalk
                 final_ID = current_ID
                 RETURN
             ELSE 
-                CALL RANDOM_NUMBER(rand_val)
+                rand_val = xorshift(seed)
                 rand_i = INT(rand_val * REAL(num_candidates)) + 1
                 current_ID = candidates(rand_i)
                 visited(current_ID) = .TRUE.
@@ -166,36 +169,22 @@ MODULE RandomWalk
         INTEGER :: i, th_end_ID
         REAL(8) :: start_x, start_y, end_x, end_y, R
 
-        INTEGER :: n_threads, max_seed_size, th_id
-        INTEGER, ALLOCATABLE :: thread_seeds(:,:), temp_seed(:)
-
+        INTEGER :: th_id
+        INTEGER(8) :: th_seed
+ 
         start_x = grid_points(start_ID, 1)
         start_y = grid_points(start_ID, 2)
 
         ALLOCATE(R_values(nWalks))
 
-        !$OMP MASTER
-        n_threads = OMP_GET_MAX_THREADS()
-        CALL RANDOM_SEED(size = max_seed_size)
-        ALLOCATE(thread_seeds(n_threads, max_seed_size))
-        ALLOCATE(temp_seed(max_seed_size))
-        CALL RANDOM_SEED(GET=temp_seed) 
-        DO i = 1, n_threads
-            temp_seed(1) = temp_seed(1) + (i * 1000) + (i * i * 37)
-            CALL RANDOM_SEED(PUT=temp_seed)
-            CALL RANDOM_SEED(GET=thread_seeds(i, :))
-        END DO
-        DEALLOCATE(temp_seed)
-        !$OMP END MASTER
-        !$OMP BARRIER
-
-        !$OMP PARALLEL PRIVATE(th_id, th_end_ID, end_x, end_y, R) DEFAULT(SHARED) 
+        !$OMP PARALLEL PRIVATE(th_id, th_end_ID, end_x, end_y, R, th_seed) DEFAULT(SHARED) 
         th_id = OMP_GET_THREAD_NUM() + 1
-        CALL RANDOM_SEED(PUT=thread_seeds(th_id, :))
+        th_seed = 123456789_8 + (INT(th_id, 8) * 987654321_8)
+        th_seed = IEOR(th_seed, ISHFT(th_seed, 13))
 
-        !$OMP DO SCHEDULE(DYNAMIC)
+        !$OMP DO SCHEDULE(STATIC)
         DO i = 1, nWalks
-            CALL random_walk_simple(nsteps, nedges, num_edges, start_ID, th_end_ID)
+            CALL random_walk_simple(nsteps, nedges, num_edges, start_ID, th_end_ID, th_seed)
             end_x = grid_points(th_end_ID, 1)
             end_y = grid_points(th_end_ID, 2)
             R = SQRT( (end_x - start_x)**2 + (end_y - start_y)**2 )
@@ -204,8 +193,6 @@ MODULE RandomWalk
         !$OMP END DO
 
         !$OMP END PARALLEL
-
-        DEALLOCATE(thread_seeds)
         
     END SUBROUTINE simulate_random_walks_simple
 
@@ -225,8 +212,8 @@ MODULE RandomWalk
         REAL(8) :: start_x, start_y, end_x, end_y, R
         LOGICAL :: th_success
 
-        INTEGER :: n_threads, max_seed_size, th_id
-        INTEGER, ALLOCATABLE :: thread_seeds(:,:), temp_seed(:)
+        INTEGER :: th_id
+        INTEGER(8) :: th_seed
 
         start_x = grid_points(start_ID, 1)
         start_y = grid_points(start_ID, 2)
@@ -234,33 +221,19 @@ MODULE RandomWalk
 
         ALLOCATE(R_values(nWalks))
 
-        !$OMP MASTER
-        n_threads = OMP_GET_MAX_THREADS()
-        CALL RANDOM_SEED(size = max_seed_size)
-        ALLOCATE(thread_seeds(n_threads, max_seed_size))
-        ALLOCATE(temp_seed(max_seed_size))
-        CALL RANDOM_SEED(GET=temp_seed) 
-        DO i = 1, n_threads
-            temp_seed(1) = temp_seed(1) + (i * 1000) + (i * i * 37)
-            CALL RANDOM_SEED(PUT=temp_seed)
-            CALL RANDOM_SEED(GET=thread_seeds(i, :))
-        END DO
-        DEALLOCATE(temp_seed)
-        !$OMP END MASTER
-        !$OMP BARRIER
-
-        !$OMP PARALLEL PRIVATE(th_id, th_end_ID, th_nsteps_done, th_success, end_x, end_y, R) DEFAULT(SHARED) 
+        !$OMP PARALLEL PRIVATE(th_id, th_end_ID, th_nsteps_done, th_success, end_x, end_y, R, th_seed) DEFAULT(SHARED) 
         th_id = OMP_GET_THREAD_NUM() + 1
-        CALL RANDOM_SEED(PUT=thread_seeds(th_id, :))
+        th_seed = 123456789_8 + (INT(th_id, 8) * 987654321_8)
+        th_seed = IEOR(th_seed, ISHFT(th_seed, 13))
 
-        !$OMP DO SCHEDULE(DYNAMIC) REDUCTION(+:tot_attempts) 
+        !$OMP DO SCHEDULE(STATIC) REDUCTION(+:tot_attempts) 
         DO i = 1, nWalks
             th_success = .FALSE.
 
             DO WHILE (.NOT. th_success)
                 tot_attempts = tot_attempts + 1
 
-                CALL random_walk_noback(nsteps, nedges, num_edges, start_ID, th_end_ID, th_nsteps_done)
+                CALL random_walk_noback(nsteps, nedges, num_edges, start_ID, th_end_ID, th_nsteps_done, th_seed)
                 IF (th_nsteps_done == nsteps) THEN
                     th_success = .TRUE.
                 END IF
@@ -276,7 +249,6 @@ MODULE RandomWalk
 
         !$OMP END PARALLEL
 
-        DEALLOCATE(thread_seeds)
 
     END SUBROUTINE simulate_random_walks_noback
 
@@ -296,8 +268,8 @@ MODULE RandomWalk
         REAL(8) :: start_x, start_y, end_x, end_y, R
         LOGICAL :: th_success
 
-        INTEGER :: n_threads, max_seed_size, th_id
-        INTEGER, ALLOCATABLE :: thread_seeds(:,:), temp_seed(:)
+        INTEGER :: th_id
+        INTEGER(8) :: th_seed
 
         start_x = grid_points(start_ID, 1)
         start_y = grid_points(start_ID, 2)
@@ -305,33 +277,19 @@ MODULE RandomWalk
 
         ALLOCATE(R_values(nWalks))
 
-        !$OMP MASTER
-        n_threads = OMP_GET_MAX_THREADS()
-        CALL RANDOM_SEED(size = max_seed_size)
-        ALLOCATE(thread_seeds(n_threads, max_seed_size))
-        ALLOCATE(temp_seed(max_seed_size))
-        CALL RANDOM_SEED(GET=temp_seed) 
-        DO i = 1, n_threads
-            temp_seed(1) = temp_seed(1) + (i * 1000) + (i * i * 37)
-            CALL RANDOM_SEED(PUT=temp_seed)
-            CALL RANDOM_SEED(GET=thread_seeds(i, :))
-        END DO
-        DEALLOCATE(temp_seed)
-        !$OMP END MASTER
-        !$OMP BARRIER
-
         !$OMP PARALLEL PRIVATE(th_id, th_end_ID, th_nsteps_done, th_success, end_x, end_y, R) DEFAULT(SHARED) 
         th_id = OMP_GET_THREAD_NUM() + 1
-        CALL RANDOM_SEED(PUT=thread_seeds(th_id, :))
+        th_seed = 123456789_8 + (INT(th_id, 8) * 987654321_8)
+        th_seed = IEOR(th_seed, ISHFT(th_seed, 13))
 
-        !$OMP DO SCHEDULE(DYNAMIC) REDUCTION(+:tot_attempts) 
+        !$OMP DO SCHEDULE(DYNAMIC, 5) REDUCTION(+:tot_attempts) 
         DO i = 1, nWalks
             th_success = .FALSE. 
 
             DO WHILE (.NOT. th_success)
                 tot_attempts = tot_attempts + 1
 
-                CALL random_walk_onlyonce(nsteps, nedges, num_edges, start_ID, th_end_ID, th_nsteps_done)
+                CALL random_walk_onlyonce(nsteps, nedges, num_edges, start_ID, th_end_ID, th_nsteps_done, th_seed)
                 IF (th_nsteps_done == nsteps) THEN
                     th_success = .TRUE.
                 END IF
@@ -347,7 +305,6 @@ MODULE RandomWalk
 
         !$OMP END PARALLEL
 
-        DEALLOCATE(thread_seeds)
 
     END SUBROUTINE simulate_random_walks_onlyonce
 
@@ -468,5 +425,29 @@ MODULE RandomWalk
 
         WRITE(*,'(A,I2.2,A,I2.2,A,I2.2,A,1X,A)') '[', h, ':', m, ':', s, ']:', TRIM(message)
     END SUBROUTINE CONSOLE
+
+
+
+    FUNCTION xorshift(seed) RESULT(random)
+        INTEGER(8), INTENT(INOUT) :: seed
+        INTEGER(8) :: state
+        REAL(8) :: random
+
+        REAL(8), PARAMETER :: to_double = 1.08420217248550444d-19
+
+        state = seed 
+        state = IEOR(state, ISHFT(state, 13)) 
+        state = IEOR(state, ISHFT(state, -7))
+        state = IEOR(state, ISHFT(state, 17))  
+
+        seed = state
+
+        state = state * 2685821657736338717_8
+
+        random = REAL(ABS(state),8) * to_double
+
+    END FUNCTION xorshift
+
+
 
 END MODULE RandomWalk

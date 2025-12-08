@@ -13,7 +13,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=64
-#SBATCH --mem-per-cpu=1G
+#SBATCH --mem=16G
 
 
 echo "=========================================================="
@@ -33,8 +33,8 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export OMP_MAX_ACTIVE_LEVELS=1
 
 # Running computation
-echo "Running computation $HOME/NTMF021/random_walk"
-$HOME/NTMF021/random_walk
+echo "Running computation $HOME/NTMF021/RandomWalk/random_walk"
+$HOME/NTMF021/RandomWalk/random_walk
 
 echo "=========================================================="
 echo "Computation finished."

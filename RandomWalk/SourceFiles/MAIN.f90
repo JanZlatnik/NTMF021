@@ -24,7 +24,7 @@ PROGRAM MAIN
     INTEGER, PARAMETER              :: n_plotting_iterations = 9
     INTEGER, PARAMETER              :: n_penrose_iterations = 14
 
-    INTEGER, PARAMETER              :: nsteps_array(*) = (/ 5, 10, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250 /)
+    INTEGER, PARAMETER              :: nsteps_array(*) = (/ 5, 10, 25, 50, 75, 100, 125, 150, 175, 200, 225, 250, 300/)
 
     ! =======================================================================
     ! Grid generation parameters
