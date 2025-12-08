@@ -3,7 +3,7 @@
 ! Contains: Computation of the probability of percolation for different            !   
 !           probabilities of occupation and number of Penrose substitutions        !
 !                                                                                  !
-! Last revision:    06/12/2025                                                     !                  
+! Last revision:    07/12/2025                                                     !                  
 !                                                                                  !
 !----------------------------------------------------------------------------------!
 
@@ -13,9 +13,9 @@ MODULE Percolation
     USE omp_lib
     IMPLICIT NONE
     PRIVATE
-    PUBLIC :: master_percolations
+    PUBLIC :: master_percolations, xorshift
 
-    INTEGER, PARAMETER :: nSims = 10000
+    INTEGER, PARAMETER :: nSims = 100000
 
 
     CONTAINS
@@ -23,7 +23,7 @@ MODULE Percolation
     ! =======================================================================
     ! Subroutine that occupies grid and computes whether it is spanned
     ! =======================================================================
-    SUBROUTINE percolate(n_nodes, neighbors, num_neighbors, boundary_flags, p_occup, occupied, clusters, cluster_flags, is_spanned)
+    SUBROUTINE percolate(n_nodes, neighbors, num_neighbors, boundary_flags, p_occup, occupied, clusters, cluster_flags, is_spanned, seed)
         IMPLICIT NONE
         INTEGER, INTENT(IN)                 :: n_nodes
         INTEGER, DIMENSION(:,:), INTENT(IN) :: neighbors
@@ -31,6 +31,7 @@ MODULE Percolation
         LOGICAL, DIMENSION(:,:), INTENT(IN) :: boundary_flags
         REAL(8), INTENT(IN)                 :: p_occup
         LOGICAL, INTENT(OUT)                :: is_spanned
+        INTEGER(8), INTENT(INOUT)           :: seed
 
         LOGICAL, INTENT(INOUT) :: occupied(:)
         INTEGER, INTENT(INOUT) :: clusters(:)
@@ -44,7 +45,7 @@ MODULE Percolation
 
 
         DO i = 1, n_nodes
-            CALL RANDOM_NUMBER(rand_num)
+            rand_num = xorshift(seed)
             IF (rand_num < p_occup) THEN
                 occupied(i) = .TRUE.
                 clusters(i) = i
@@ -138,31 +139,16 @@ MODULE Percolation
         INTEGER, ALLOCATABLE :: clusters(:)
         LOGICAL, ALLOCATABLE :: cluster_flags(:,:)
 
-        INTEGER :: n_threads, max_seed_size, th_id
-        INTEGER, ALLOCATABLE :: thread_seeds(:,:), temp_seed(:)
+        INTEGER :: th_id
+        INTEGER(8) :: th_seed
 
         n_spanned = 0
 
 
-        !$OMP MASTER
-        n_threads = OMP_GET_MAX_THREADS()
-        CALL RANDOM_SEED(size = max_seed_size)
-        ALLOCATE(thread_seeds(n_threads, max_seed_size))
-        ALLOCATE(temp_seed(max_seed_size))
-        CALL RANDOM_SEED(GET=temp_seed) 
-        DO i = 1, n_threads
-            temp_seed(1) = temp_seed(1) + (i * 1000) + (i * i * 37)
-            CALL RANDOM_SEED(PUT=temp_seed)
-            CALL RANDOM_SEED(GET=thread_seeds(i, :))
-        END DO
-        DEALLOCATE(temp_seed)
-        !$OMP END MASTER
-        !$OMP BARRIER
-
-
-        !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, th_id, is_spanned, occupied, clusters, cluster_flags) REDUCTION(+:n_spanned)
+        !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, th_id, is_spanned, occupied, clusters, cluster_flags, th_seed) REDUCTION(+:n_spanned)
             th_id = OMP_GET_THREAD_NUM() + 1
-            CALL RANDOM_SEED(PUT=thread_seeds(th_id,:))
+            th_seed = 123456789_8 + (INT(th_id, 8) * 987654321_8)
+            th_seed = IEOR(th_seed, ISHFT(th_seed, 13))
 
             ALLOCATE(occupied(n_nodes))
             ALLOCATE(clusters(n_nodes))
@@ -170,7 +156,7 @@ MODULE Percolation
 
             !$OMP DO SCHEDULE(STATIC)
             DO i = 1, nSims
-                CALL percolate(n_nodes, neighbors, num_neighbors, boundary_flags, p_occup, occupied, clusters, cluster_flags, is_spanned)
+                CALL percolate(n_nodes, neighbors, num_neighbors, boundary_flags, p_occup, occupied, clusters, cluster_flags, is_spanned, th_seed)
                 IF (is_spanned) THEN
                     n_spanned = n_spanned + 1
                 END IF
@@ -180,8 +166,6 @@ MODULE Percolation
             DEALLOCATE(occupied, clusters, cluster_flags)
 
         !$OMP END PARALLEL
-
-        DEALLOCATE(thread_seeds)
 
         p_perc = REAL(n_spanned, 8) / REAL(nSims, 8)
 
@@ -332,5 +316,26 @@ MODULE Percolation
     END SUBROUTINE CONSOLE
 
 
+
+
+    FUNCTION xorshift(seed) RESULT(random)
+        INTEGER(8), INTENT(INOUT) :: seed
+        INTEGER(8) :: state
+        REAL(8) :: random
+
+        REAL(8), PARAMETER :: to_double = 1.08420217248550444d-19
+
+        state = seed 
+        state = IEOR(state, ISHFT(state, 13)) 
+        state = IEOR(state, ISHFT(state, -7))
+        state = IEOR(state, ISHFT(state, 17))  
+
+        seed = state
+
+        state = state * 2685821657736338717_8
+
+        random = REAL(ABS(state),8) * to_double
+
+    END FUNCTION xorshift
 
 END MODULE Percolation

@@ -2,7 +2,7 @@
 !                                                                                  !    
 ! Contains: Runns all modules, exports data                                        !
 !                                                                                  !
-! Last revision:    06/12/2025                                                     !                  
+! Last revision:    07/12/2025                                                     !                  
 !                                                                                  !
 !----------------------------------------------------------------------------------!
 
@@ -18,14 +18,16 @@ PROGRAM MAIN
     ! Computation settings & parameters
     ! =======================================================================
     LOGICAL, PARAMETER              :: test_grid_plotting = .TRUE.
+    LOGICAL, PARAMETER              :: test_rng = .TRUE.
     LOGICAL, PARAMETER              :: percolation_computation = .TRUE.
 
     INTEGER, PARAMETER              :: n_plotting_iterations = 7
+    INTEGER, PARAMETER              :: n_rng = 1000000
 
     INTEGER, PARAMETER              :: n_iter_array(*) = (/ 7, 9, 11, 13 /)
-    INTEGER, PARAMETER              :: n_prob_points = 250
+    INTEGER, PARAMETER              :: n_prob_points = 500
     REAL(8), PARAMETER              :: p_crit_expected = 0.5839d0
-    REAL(8), PARAMETER              :: a_steep = 16.0d0
+    REAL(8), PARAMETER              :: a_steep = 32.0d0
     REAL(8), PARAMETER              :: range_lim = 0.995d0
 
     ! =======================================================================
@@ -44,6 +46,7 @@ PROGRAM MAIN
     INTEGER :: iounit
     REAL*8, ALLOCATABLE :: p_occup_array(:)
     REAL*8 :: x, prob
+    INTEGER(8) :: seed
 
 
 
@@ -131,6 +134,35 @@ PROGRAM MAIN
         CALL CONSOLE("======================================================================")
         CALL CONSOLE("                     PENROSE GRID TEST COMPLETED                      ")
         CALL CONSOLE("======================================================================")
+
+    END IF
+
+
+
+    ! =======================================================================
+    ! RNG test
+    ! =======================================================================
+    IF (test_rng) THEN
+                
+        CALL CONSOLE("======================================================================")
+        CALL CONSOLE("                         STARTING RNG TESTING                         ")
+        CALL CONSOLE("======================================================================")
+
+        seed = 987654321_8
+        OPEN(NEWUNIT=iounit, FILE='rng_test.txt', STATUS='REPLACE', ACTION='WRITE')
+
+        DO i = 1, n_rng
+            WRITE(iounit, *) xorshift(seed)
+        END DO
+
+        CLOSE(iounit)
+
+
+        CALL CONSOLE("======================================================================")
+        CALL CONSOLE("                         RNG TESTING FINISHED                         ")
+        CALL CONSOLE("======================================================================")
+
+
 
     END IF
 

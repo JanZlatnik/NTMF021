@@ -1,7 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.interpolate import interp1d
-from scipy.optimize import brentq
 
 data_file = 'results/percolation_data.txt'
 output_pdf = 'results/percolation_curves.pdf'
@@ -73,7 +71,7 @@ ax.axvline(pcrit, color='black', linestyle='-.', linewidth=1, label=f'$p_c \\app
 ax.set_xlabel(r"Occupation probability")
 ax.set_ylabel(r"Percolation probability")
 
-ax.set_xlim(0, 1)
+ax.set_xlim(0.5, 0.675)
 ax.set_ylim(-0.05, 1.05)
 
 ax.legend()
